@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>InstagramDiff v1</title>
+
+    <style>
+        /* --- TOKYO NIGHT THEME COLORS --- */
+        :root {
+            --tn-bg: #1a1b26;
+            --tn-bg-dark: #16161e;
+            --tn-bg-light: #24283b;
+            --tn-fg: #c0caf5;
+            --tn-accent-blue: #7aa2f7;
+            --tn-accent-cyan: #7dcfff;
+            --tn-accent-green: #9ece6a;
+            --tn-accent-magenta: #bb9af7;
+            --tn-border: #414868;
+            --tn-danger: #f7768e;
+        }
+
+        body {
+            background: var(--tn-bg);
+            color: var(--tn-fg);
+            font-family: "Segoe UI", sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 30px;
+            border: 1px solid var(--tn-border);
+            border-radius: 10px;
+            background: var(--tn-bg-dark);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+        }
+
+        h2,
+        h3 {
+            color: var(--tn-accent-blue);
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin: 20px 0 8px;
+            font-weight: bold;
+            color: var(--tn-accent-cyan);
+        }
+
+        input[type="file"] {
+            background: var(--tn-bg-light);
+            color: var(--tn-fg);
+            border: 1px solid var(--tn-border);
+            padding: 10px;
+            border-radius: 6px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        button {
+            margin-top: 25px;
+            padding: 12px 20px;
+            background: var(--tn-accent-blue);
+            color: var(--tn-bg);
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s background;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--tn-accent-cyan);
+        }
+
+        button:disabled {
+            background: #3b4261;
+            color: #7a819d;
+            cursor: not-allowed;
+        }
+
+        .collapsible {
+            margin-top: 25px;
+            border: 1px solid var(--tn-border);
+            border-radius: 8px;
+            background: var(--tn-bg-light);
+            overflow: hidden;
+        }
+
+        .collapsible-header {
+            padding: 12px 15px;
+            background: var(--tn-bg);
+            color: var(--tn-accent-blue);
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            user-select: none;
+            border-bottom: 1px solid var(--tn-border);
+        }
+
+        .collapsible-header:hover {
+            background: var(--tn-bg-dark);
+        }
+
+        .collapsible-header .count {
+            color: var(--tn-accent-cyan);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            padding: 0 15px;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .collapsible-content.open {
+            padding: 15px;
+        }
+
+        .result-item {
+            display: block;
+            margin: 6px 0;
+            padding: 8px 12px;
+            border-left: 3px solid var(--tn-accent-green);
+            border-radius: 4px;
+            background: var(--tn-bg);
+            color: var(--tn-accent-green);
+            text-decoration: none;
+            transition: 0.2s ease;
+            word-break: break-word;
+        }
+
+        .result-item:hover {
+            color: var(--tn-accent-magenta);
+            border-color: var(--tn-accent-magenta);
+            background: var(--tn-bg-dark);
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>InstagramDiff v1</h2>
+
+    <label><strong>Upload followers.json</strong></label>
+    <input type="file" id="followersFile" accept="application/json">
+
+    <label><strong>Upload following.json</strong></label>
+    <input type="file" id="followingFile" accept="application/json">
+
+    <button id="processBtn" disabled>Process</button>
+
+    <div class="collapsible">
+        <div class="collapsible-header" id="header-not-following-back">
+            <span>People not following you back</span>
+            <span class="count" id="count-not-following-back">(0)</span>
+        </div>
+        <div class="collapsible-content" id="not-following-back"></div>
+    </div>
+
+    <div class="collapsible">
+        <div class="collapsible-header" id="header-not-followed-by-you">
+            <span>People you don't follow back</span>
+            <span class="count" id="count-not-followed-by-you">(0)</span>
+        </div>
+        <div class="collapsible-content" id="not-followed-by-you"></div>
+    </div>
+
+    <script>
+
+        let followersData = null;
+        let followingData = null;
+
+        document.getElementById("followersFile").addEventListener("change", function () {
+            readJsonFile(this.files[0], data => {
+                followersData = data;
+                enableButtonIfReady();
+            });
+        });
+
+        document.getElementById("followingFile").addEventListener("change", function () {
+            readJsonFile(this.files[0], data => {
+                followingData = data;
+                enableButtonIfReady();
+            });
+        });
+
+        function enableButtonIfReady() {
+            if (followersData && followingData) {
+                document.getElementById("processBtn").disabled = false;
+            }
+        }
+
+        document.getElementById("processBtn").addEventListener("click", () => {
+            const followers = extractFollowers(followersData); // [{name, url}, ...]
+            const following = extractFollowing(followingData); // [{name, url}, ...]
+
+            const { notFollowingBack, notFollowedByYou } = diffFollowers(followers, following);
+
+            displayResults("not-following-back", notFollowingBack);
+            displayResults("not-followed-by-you", notFollowedByYou);
+        });
+
+        function readJsonFile(file, callback) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    callback(JSON.parse(e.target.result));
+                } catch (err) {
+                    alert("Invalid JSON file: " + file.name);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function extractFollowers(json) {
+            return json.map(entry => {
+                return {
+                    name: entry.string_list_data[0].value,
+                    url: entry.string_list_data[0].href,
+                };
+            });
+        }
+
+        function extractFollowing(json) {
+            return json.relationships_following.map(entry => {
+                return {
+                    name: entry.title,
+                    url: entry.string_list_data[0].href,
+                };
+            });
+        }
+
+        function diffFollowers(followers, following) {
+            const followerNames = new Set(followers.map(f => f.name));
+            const followingNames = new Set(following.map(f => f.name));
+
+            // 1. People you follow who do NOT follow you back
+            const notFollowingBack = following.filter(f => !followerNames.has(f.name));
+
+            // 2. People who follow you but you do NOT follow back
+            const notFollowedByYou = followers.filter(f => !followingNames.has(f.name));
+
+            return {
+                notFollowingBack,   // list of objects
+                notFollowedByYou    // list of objects
+            };
+        }
+
+        function displayResults(containerId, list) {
+            const container = document.getElementById(containerId);
+            const countEl = document.getElementById("count-" + containerId);
+
+            container.innerHTML = "";
+            countEl.textContent = `(${list.length})`;
+
+            if (list.length === 0) {
+                container.innerHTML = "<span style='color: var(--tn-accent-green);'>None 🎉</span>";
+            } else {
+                list.forEach(user => {
+                    const a = document.createElement("a");
+                    a.href = user.url || "https://instagram.com/" + user.name;
+                    a.target = "_blank";
+                    a.textContent = user.name;
+                    a.className = "result-item";
+                    container.appendChild(a);
+                });
+            }
+
+            // Adjust height if opened
+            if (container.classList.contains("open")) {
+                container.style.maxHeight = container.scrollHeight + "px";
+            }
+        }
+
+
+
+
+        function setupCollapsible(headerId, contentId) {
+            const header = document.getElementById(headerId);
+            const content = document.getElementById(contentId);
+
+            header.addEventListener("click", () => {
+                const isOpen = content.classList.contains("open");
+                if (isOpen) {
+                    content.style.maxHeight = "0px";
+                    content.classList.remove("open");
+                } else {
+                    content.classList.add("open");
+                    content.style.maxHeight = content.scrollHeight + "px";
+                }
+            });
+        }
+
+        // Initialize collapsibles
+        setupCollapsible("header-not-following-back", "not-following-back");
+        setupCollapsible("header-not-followed-by-you", "not-followed-by-you");
+
+    </script>
+
+</body>
+
+</html>
