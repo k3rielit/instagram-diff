@@ -136,6 +136,12 @@
             border-color: var(--tn-accent-magenta);
             background: var(--tn-bg-dark);
         }
+
+        .result-item.visited {
+            border-left-color: var(--tn-danger);
+            color: var(--tn-danger);
+            background: var(--tn-bg-dark);
+        }
     </style>
 </head>
 
@@ -265,6 +271,9 @@
                     a.textContent = user.name;
                     a.className = "result-item";
                     container.appendChild(a);
+                    a.addEventListener("click", () => {
+                        a.classList.add("visited");
+                    });
                 });
             }
 
